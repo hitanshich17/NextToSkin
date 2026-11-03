@@ -21,4 +21,4 @@ fi
 
 cd "$ROOT/services/core-api"
 ./mvnw -q spring-boot:run \
-  -Dspring-boot.run.arguments="--spring.main.web-application-type=none --skinvidhi.import.obf-file=$DUMP"
+  -Dspring-boot.run.arguments="--spring.main.web-application-type=none --nexttoskin.import.obf-file=$DUMP"

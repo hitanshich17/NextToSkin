@@ -1,6 +1,6 @@
-# SkinVidhi routine rules: evidence and sources
+# NextToSkin routine rules: evidence and sources
 
-SkinVidhi is not medical advice. These rules choose products; they do not diagnose or treat conditions.
+NextToSkin is not medical advice. These rules choose products; they do not diagnose or treat conditions.
 Each rule lists its evidence level and source so it can be checked and updated.
 
 **Evidence levels**

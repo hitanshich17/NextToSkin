@@ -1,4 +1,4 @@
-"""SkinVidhi AI service.
+"""NextToSkin AI service.
 
 Responsible for the AI-heavy work: reading ingredient lists from label photos,
 embeddings for product similarity, and plain-language explanations.
@@ -15,7 +15,7 @@ from app.llm import AnthropicLlm, Llm, LlmError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="SkinVidhi AI Service", version="0.1.0")
+app = FastAPI(title="NextToSkin AI Service", version="0.1.0")
 
 
 @app.get("/health")

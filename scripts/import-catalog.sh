@@ -9,4 +9,4 @@ source "$(dirname "$0")/db-env.sh"
 
 cd "$ROOT/services/core-api"
 ./mvnw -q spring-boot:run \
-  -Dspring-boot.run.arguments="--spring.main.web-application-type=none --skinvidhi.import.catalog-dir=$ROOT/catalog"
+  -Dspring-boot.run.arguments="--spring.main.web-application-type=none --nexttoskin.import.catalog-dir=$ROOT/catalog"

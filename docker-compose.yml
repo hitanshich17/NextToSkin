@@ -1,4 +1,4 @@
-# Local development environment for SkinVidhi.
+# Local development environment for NextToSkin.
 # Everything runs on your machine for free. AWS is only used later for deployment.
 #   docker compose up --build
 name: skinvidhi

@@ -1,8 +1,8 @@
-# SkinVidhi
+# NextToSkin
 
-Answer a one-minute quiz and get a morning and night skincare routine built from products across every brand, within your budget. Brands build routines from their own lines; SkinVidhi compares them all.
+Answer a one-minute quiz and get a morning and night skincare routine built from products across every brand, within your budget. Brands build routines from their own lines; NextToSkin compares them all.
 
-> SkinVidhi is not medical advice. Severe or unusual skin problems should be seen by a dermatologist.
+> NextToSkin is not medical advice. Severe or unusual skin problems should be seen by a dermatologist.
 
 ## Architecture
 

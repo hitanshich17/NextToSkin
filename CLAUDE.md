@@ -1,14 +1,14 @@
-# SkinVidhi: project context for Claude Code
+# NextToSkin: project context for Claude Code
 
 ## What this is
 A US-first skincare routine builder and portfolio project (no monetization, no affiliate links).
-Think "Skyscanner for skincare": brands build routines only from their own lines; SkinVidhi compares
+Think "Skyscanner for skincare": brands build routines only from their own lines; NextToSkin compares
 products across every brand.
 
 1. A quick quiz (about a minute): skin type, main concerns, sensitivities, budget, city, and an
    optional skin tone / sun-reaction question (closer to the Fitzpatrick scale than to ethnicity).
    The city gives climate (humidity, UV, pollution), so we do not ask about it.
-2. SkinVidhi builds a morning and a night routine from products across all brands, within the budget.
+2. NextToSkin builds a morning and a night routine from products across all brands, within the budget.
 3. For each suggested product the user can say "already tried it: liked / disliked";
    a dislike swaps in a replacement that does the same job without the suspect ingredients.
 4. Later: a community section where people post home remedies they tried and others upvote them,

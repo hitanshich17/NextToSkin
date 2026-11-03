@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.skinvidhi</groupId>
+    <groupId>com.nexttoskin</groupId>
     <artifactId>core-api</artifactId>
     <version>0.1.0</version>
     <name>core-api</name>
-    <description>SkinVidhi core API: products, ingredients, quiz, routine rules, replacements</description>
+    <description>NextToSkin core API: products, ingredients, quiz, routine rules, replacements</description>
 
     <properties>
         <java.version>21</java.version>

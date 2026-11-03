@@ -1,4 +1,4 @@
-# SkinVidhi quiz
+# NextToSkin quiz
 
 Target: about one minute. One question per screen, one tap per answer where possible.
 Every question must change the routine; if it doesn't, it doesn't belong here.
@@ -31,4 +31,4 @@ Filters the user can toggle after seeing their routine: fragrance-free only, US-
 - **Flaky or peeling patches:** "If patches are itchy, scaly, spreading, or don't improve within 2–3 weeks,
   see a dermatologist. This can be a skin condition (such as eczema, psoriasis or seborrheic dermatitis)
   rather than dryness."
-- SkinVidhi is not medical advice; this note is shown whenever a concern can point to a medical condition.
+- NextToSkin is not medical advice; this note is shown whenever a concern can point to a medical condition.
