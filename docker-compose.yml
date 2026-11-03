@@ -53,6 +53,9 @@ services:
     environment:
       APP_ENV: local
       LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-claude-haiku-5-5}
+      LLM_EFFORT: ${LLM_EFFORT:-low}
+      LLM_THINKING: ${LLM_THINKING:-disabled}
     ports:
       - "8000:8000"
     healthcheck:

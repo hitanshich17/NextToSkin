@@ -22,8 +22,10 @@ FACTS = {
     "notes": ["Use your retinoid at night only. Start every other night."],
 }
 
-GOOD = ("Your night treatment is The INKEY List Starter Retinol Serum, because a retinoid is one of the "
-        "best-studied ingredients for breakouts. The light gel cleanser suits oily skin in dry air.")
+GOOD = ("Your night treatment is {PM treatment}, because a retinoid is one of the "
+        "best-studied ingredients for breakouts. {AM cleanser} has a light texture for oily skin.")
+FILLED = GOOD.replace("{PM treatment}", "The INKEY List Starter Retinol Serum").replace("{AM cleanser}",
+                                                                                     "Senka Perfect Whip")
 
 
 class FakeLlm:
@@ -50,7 +52,7 @@ def test_returns_the_llm_explanation():
     use(llm)
     response = client.post("/explanations", json=FACTS)
     assert response.status_code == 200
-    assert response.json() == {"text": GOOD}
+    assert response.json() == {"text": FILLED}
 
 
 def test_sends_only_the_facts():
@@ -59,7 +61,8 @@ def test_sends_only_the_facts():
     client.post("/explanations", json=FACTS)
     system, user = llm.calls[0]
     assert "Every statement must come from the facts" in system
-    assert "Senka Perfect Whip" in user
+    assert "Senka Perfect Whip" not in user  # names stay out; the LLM writes placeholders
+    assert "{AM cleanser}" in user
     assert "Reacts to new products: SOMETIMES" in user
     assert '"a retinoid": "one of the best-studied ingredients' in user  # roles come from us, not the LLM
     assert "pregnan" not in user.lower()
@@ -121,10 +124,51 @@ def test_more_than_four_sentences_is_rejected():
 
 
 def test_a_misspelled_product_name_is_rejected():
-    use(FakeLlm(answer=GOOD.replace("Senka Perfect Whip", "Senka Perfekt Whip") + " Senka Perfekt Whip cleanses."))
+    # Backstop for a name typed out instead of its placeholder.
+    use(FakeLlm(answer=GOOD + " Senka Perfekt Whip cleanses."))
     assert client.post("/explanations", json=FACTS).status_code == 503
 
 
-def test_exact_product_names_and_ordinary_words_pass():
-    use(FakeLlm(answer=GOOD + " Senka Perfect Whip cleanses morning and night."))
-    assert client.post("/explanations", json=FACTS).status_code == 200
+def test_an_unknown_placeholder_is_rejected():
+    use(FakeLlm(answer=GOOD + " Finish with {AM sunscreen}."))  # no sunscreen step in these facts
+    assert client.post("/explanations", json=FACTS).status_code == 503
+
+
+def test_placeholders_become_exact_names():
+    use(FakeLlm(answer=GOOD + " Use {AM cleanser} morning and night."))
+    text = client.post("/explanations", json=FACTS).json()["text"]
+    assert "{" not in text
+    assert text.count("Senka Perfect Whip") == 2
+
+
+def test_a_product_used_morning_and_night_has_one_placeholder():
+    facts = {**FACTS, "steps": FACTS["steps"] + [
+        {"time": "PM", "step": "cleanser", "product": "Senka Perfect Whip", "keyIngredients": [], "reasons": []}]}
+    llm = FakeLlm(answer="Your night treatment is {PM treatment}, because a retinoid is one of the best-studied "
+                         "ingredients for breakouts. Use {cleanser} morning and night.")
+    use(llm)
+    response = client.post("/explanations", json=facts)
+    assert response.status_code == 200
+    assert response.json()["text"].count("Senka Perfect Whip") == 1
+    user = llm.calls[0][1]
+    assert '"placeholder": "{cleanser}"' in user and '"used": "morning and night"' in user
+    assert "{AM cleanser}" not in user
+
+
+def test_a_capitalized_placeholder_still_matches():
+    use(FakeLlm(answer=GOOD + " {Am Cleanser} is used every morning."))
+    assert client.post("/explanations", json=FACTS).json()["text"].count("Senka Perfect Whip") == 2
+
+
+def test_mentioning_its_instructions_is_rejected():
+    use(FakeLlm(answer=GOOD + " The sunscreen is listed without additional reasons here."))
+    assert client.post("/explanations", json=FACTS).status_code == 503
+
+
+def test_your_before_a_the_name_is_dropped():
+    facts = {**FACTS, "steps": FACTS["steps"] + [
+        {"time": "AM", "step": "moisturizer", "product": "The Ordinary Natural Moisturizing Factors + HA"}]}
+    use(FakeLlm(answer=GOOD + " Your {AM moisturizer} draws water into the skin. And the {AM moisturizer} too."))
+    text = client.post("/explanations", json=facts).json()["text"]
+    assert "Your The" not in text and "the The" not in text
+    assert " The Ordinary Natural Moisturizing Factors + HA draws" in text

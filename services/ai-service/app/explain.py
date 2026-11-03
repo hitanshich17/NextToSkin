@@ -74,19 +74,22 @@ Explain why: why the night treatment fits the main concern, and why the other pr
 Rules:
 - Every statement must come from the facts you are given. Describe an ingredient only with its role from \
 "ingredient roles"; never add other benefits, side effects or advice.
+- Refer to each product only by its placeholder, copied exactly with its braces, e.g. {PM treatment}. Never \
+write a brand or product name yourself.
 - Give each product only the reasons listed for it. If a product has no reasons, name it without saying why, \
 or leave it out. Never describe how a product feels, cleans or protects beyond its reasons.
 - Describe the person only with the profile lines given; don't add traits.
-- Name products exactly as given. Never name any other product or brand.
 - Safety notes (sun sensitivity, sunscreen reapplication, how often to use a product, pregnancy) are shown to the \
 reader separately. Do not mention, repeat or reword any of them.
 - This is not medical advice: never diagnose, never promise results, never use words like "cure" or "guarantee".
-- At most 4 sentences and under 90 words, one paragraph, no lists, headings or links."""
+- Speak to the reader as "you", warmly and naturally. Never mention facts, lists, reasons, placeholders or rules.
+- At most 4 short sentences and under 80 words, one paragraph, no lists, headings or links."""
 
 MIN_LENGTH = 80
 MAX_LENGTH = 700
 MAX_SENTENCES = 4
-MAX_TOKENS = 400
+# Room for thinking on models that think by default (Haiku 5.5); the length check keeps the answer short.
+MAX_TOKENS = 2000
 # Words an explanation must never use: medical claims and promises.
 BANNED = re.compile(r"\b(cure[sd]?|diagnos\w*|prescri\w*|guarantee\w*|miracle|clinically proven)\b", re.IGNORECASE)
 # The safety notes' territory: the page shows those notes word for word, so the LLM must not touch them.
@@ -95,12 +98,17 @@ SAFETY_NOTE_TOPICS = re.compile(
     re.IGNORECASE)
 REACTIVE_WORDS = re.compile(r"\b(sensitive|reactive|sensitivity|reactivity)\b", re.IGNORECASE)
 LINK = re.compile(r"https?://|www\.", re.IGNORECASE)
+# Words that show the instructions through ("which the facts list as", "listed without reasons").
+LEAKS = re.compile(r"\b(the facts|facts list|listed (as|for|without)|is listed|are listed|placeholder)\b", re.IGNORECASE)
 SENTENCE_END = re.compile(r"[.!?](\s|$)")
 WORD = re.compile(r"[A-Za-z][A-Za-z'-]{3,}")
+PLACEHOLDER = re.compile(r"\{([^{}]*)\}")
 
 
 class InvalidExplanation(Exception):
-    pass
+    def __init__(self, reason: str, text: str = ""):
+        super().__init__(reason)
+        self.text = text  # the rejected answer, for the log (facts and product names only, nothing personal)
 
 
 def misspelled_product_word(text: str, facts: ExplanationFacts) -> str | None:
@@ -132,19 +140,55 @@ def user_message(facts: ExplanationFacts) -> str:
     else:
         treatment = f"The night treatment uses {facts.treatment_active}, the first choice for the main concern."
     ingredients = sorted({i for s in facts.steps for i in s.key_ingredients})
+    # Product names stay out: the LLM writes placeholders, and fill_placeholders() puts the exact names back,
+    # so a name can never be misspelled.
+    # One entry per product: a cleanser used morning and night is one {cleanser}, not two.
+    steps = []
+    for s in facts.steps:
+        if any(p["placeholder"] == placeholder(s, facts) for p in steps):
+            continue
+        times = sorted({o.time for o in facts.steps if o.product == s.product and o.step == s.step})
+        steps.append({"placeholder": placeholder(s, facts), "used": "morning and night" if len(times) == 2
+                      else ("morning" if times == ["AM"] else "night"), "key ingredients": s.key_ingredients,
+                      "reasons": s.reasons, **({"already owned": True} if s.already_owned else {})})
     content = {
         "profile": profile,
         "treatment": treatment,
-        "steps": [s.model_dump(by_alias=True) for s in facts.steps],
+        "steps": steps,
         "ingredient roles": {i: ROLES[i] for i in ingredients if i in ROLES},
         "budget": "fits the budget" if facts.within_budget else "the cheapest routine is over the budget",
     }
     return "Facts:\n" + json.dumps(content, indent=2)
 
 
+def placeholder(step: StepFacts, facts: ExplanationFacts) -> str:
+    """{cleanser} for a product used morning and night, {AM cleanser} / {PM cleanser} when they differ."""
+    both = sum(1 for o in facts.steps if o.step == step.step and o.product == step.product) == 2
+    return "{" + (step.step if both else f"{step.time} {step.step}") + "}"
+
+
+def fill_placeholders(text: str, facts: ExplanationFacts) -> str:
+    """Replaces each placeholder with the exact product name; unknown ones are rejected."""
+    names = {placeholder(s, facts).lower(): s.product for s in facts.steps}
+
+    def name(match: re.Match) -> str:
+        key = match.group(0).lower()  # {Moisturizer} at the start of a sentence is still {moisturizer}
+        if key not in names:
+            raise InvalidExplanation(f"unknown placeholder: {match.group(0)}")
+        return names[key]
+
+    text = PLACEHOLDER.sub(name, text)
+    # "Your {moisturizer}" or "the {moisturizer}" -> "The Ordinary ...", not "Your The ..." / "the The ..."
+    return re.sub(r"\b([Yy]our|[Tt]he) (The )", r"\2", text)
+
+
 def explain(facts: ExplanationFacts, llm: Llm) -> str:
     text = llm.complete(SYSTEM_PROMPT, user_message(facts), MAX_TOKENS).strip()
-    check(text, facts)
+    text = fill_placeholders(text, facts)
+    try:
+        check(text, facts)
+    except InvalidExplanation as e:
+        raise InvalidExplanation(str(e), text) from None
     return text
 
 
@@ -162,6 +206,8 @@ def check(text: str, facts: ExplanationFacts) -> None:
         raise InvalidExplanation(f"calls skin {match.group(0)} that rarely reacts")
     if LINK.search(text):
         raise InvalidExplanation("contains a link")
+    if match := LEAKS.search(text):
+        raise InvalidExplanation(f"mentions its instructions: {match.group(0)}")
     if typo := misspelled_product_word(text, facts):
         raise InvalidExplanation(f"misspelled product name: {typo}")
     if "\n-" in text or text.lstrip().startswith(("-", "*", "#")):

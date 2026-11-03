@@ -45,9 +45,13 @@ AHAs, irritants, sensitivities). AI/ML is used where it solves a real problem:
   (irritated [default], didn't work, texture/smell, too pricey) picks the replacement. Suspects = tagged
   irritants + main actives, plus ingredients shared by 2+ dislikes and no like. pgvector similarity to
   liked products only breaks ties.
-- Explanations (step 6a): Claude Haiku 4.5 via the AI service explains the rules' decisions from facts only
-  (no pregnancy answer, no city); answers are checked (length, no medical claims, no links) and cached in Redis.
-  Whenever there is no valid LLM answer within ~4s, core-api shows a template explanation.
+- Explanations (step 6a): Claude Haiku 5.5 (thinking off, effort low; chosen over Haiku 4.5 by a 10-profile
+  comparison) explains the rules' decisions via the AI service. It gets facts only (no pregnancy answer, no city,
+  no product names: it writes placeholders that code fills in), plus a reason per pick from RoutineRules.reasons()
+  and fixed ingredient roles; safety notes are never sent (the page shows them verbatim). Answers are checked
+  (length, sentences, medical claims, safety-note topics, links, leaked instructions, near-miss product names)
+  and cached in Redis; bump ExplanationService.PROMPT_VERSION when the prompt, checks or model change.
+  Whenever there is no valid answer within ~4s, core-api shows a template explanation.
 - Sizes: fl oz -> ml, oz -> g; liquids sold in "oz" count as fl oz; creams, balms and sticks keep oz.
 - OTC active ingredients (acne treatments, sunscreens) are stored separately with their percentage.
 - Curated catalog: ~25 products per category; the author approves each list. Claude reads ingredients

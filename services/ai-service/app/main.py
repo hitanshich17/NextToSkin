@@ -32,7 +32,8 @@ def health() -> dict:
 def get_llm(settings: Settings = Depends(get_settings)) -> Llm | None:
     if not settings.llm_configured:
         return None
-    return AnthropicLlm(settings.llm_api_key, settings.llm_model, settings.llm_timeout_seconds)
+    return AnthropicLlm(settings.llm_api_key, settings.llm_model, settings.llm_timeout_seconds, settings.llm_effort,
+                        settings.llm_thinking)
 
 
 @app.post("/explanations")
@@ -46,5 +47,5 @@ def create_explanation(facts: ExplanationFacts, llm: Llm | None = Depends(get_ll
         log.warning("LLM failed: %s", e)
         raise HTTPException(status_code=503, detail="LLM unavailable") from e
     except InvalidExplanation as e:
-        log.warning("Explanation rejected: %s", e)
+        log.warning("Explanation rejected: %s | %s", e, e.text)
         raise HTTPException(status_code=503, detail="explanation rejected") from e

@@ -24,8 +24,8 @@ public class ExplanationService {
 
     private static final Logger log = LoggerFactory.getLogger(ExplanationService.class);
     static final Duration CACHE_FOR = Duration.ofDays(30);
-    /** Bump when the AI service's prompt or checks change, so explanations written under the old ones are dropped. */
-    static final String PROMPT_VERSION = "v4";
+    /** Bump when the AI service's prompt, checks or model change, so explanations written under the old ones are dropped. */
+    static final String PROMPT_VERSION = "v8";
 
     public enum Source { AI, TEMPLATE }
 
