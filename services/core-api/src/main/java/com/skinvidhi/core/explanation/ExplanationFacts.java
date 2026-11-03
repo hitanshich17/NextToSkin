@@ -48,7 +48,10 @@ public record ExplanationFacts(String skinType, List<String> concerns, String re
     private static final Set<IngredientTag> WHAT_IT_DOES = Set.of(RETINOID, AHA, BHA, VITAMIN_C, BENZOYL_PEROXIDE,
             NIACINAMIDE, TRANEXAMIC_ACID, AZELAIC_ACID, CERAMIDE, HYALURONIC_ACID, PEPTIDE, CENTELLA, UREA);
 
-    /** How actives are named in sentences ("uses a retinoid"); others are their tag in lower case. */
+    /**
+     * How actives are named in sentences ("uses a retinoid"); others are their tag in lower case. The AI service
+     * looks these names up in its ingredient roles (ai-service/app/explain.py, ROLES): keep the two in step.
+     */
     static final Map<IngredientTag, String> ACTIVES = Map.of(
             RETINOID, "a retinoid", AHA, "an AHA (alpha hydroxy acid)", BHA, "salicylic acid (a BHA)",
             VITAMIN_C, "vitamin C", BENZOYL_PEROXIDE, "benzoyl peroxide", PEPTIDE, "peptides",

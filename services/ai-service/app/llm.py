@@ -29,4 +29,7 @@ class AnthropicLlm:
             )
         except anthropic.APIError as e:
             raise LlmError(type(e).__name__) from e
+        # A reply cut off at max_tokens, or a refusal, is not an answer we can use.
+        if response.stop_reason != "end_turn":
+            raise LlmError(f"stop_reason {response.stop_reason}")
         return "".join(block.text for block in response.content if block.type == "text")
