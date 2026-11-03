@@ -297,4 +297,20 @@ class RoutineRulesTest {
         assertThat(plan.treatmentActive()).isEqualTo(VITAMIN_C);
         assertThat(plan.budgetFallbacks().keySet()).containsExactly(AZELAIC_ACID, NIACINAMIDE);
     }
+
+    @Test
+    void anExfoliatingAcidNeverCountsAsAHydratingTreatment() {
+        var lacticWithHa = p("lactic-acid-ha", "treatment", 900, AHA, 2, HYALURONIC_ACID, 7);
+        var plainHa = p("ha-serum", "treatment", 1500, HYALURONIC_ACID, 3);
+        var dryness = answers(SkinType.DRY, List.of(Concern.DRYNESS), Reactivity.RARELY, Set.of(),
+                ActivesExperience.A_LITTLE, Pregnancy.NO, null);
+
+        var plan = RoutineRules.plan(dryness, List.of(lacticWithHa, plainHa, GENTLE_CLEANSER, RICH_CREAM, MINERAL_SPF));
+        assertThat(plan.treatmentActive()).isEqualTo(HYALURONIC_ACID);
+        assertThat(ids(plan, Step.PM_TREATMENT)).containsExactly("ha-serum");
+
+        // Without a plain hyaluronic acid serum, dryness gets ceramides or no treatment, never the AHA.
+        var withoutHa = RoutineRules.plan(dryness, List.of(lacticWithHa, GENTLE_CLEANSER, RICH_CREAM, MINERAL_SPF));
+        assertThat(withoutHa.candidates().get(Step.PM_TREATMENT)).doesNotContain(lacticWithHa);
+    }
 }

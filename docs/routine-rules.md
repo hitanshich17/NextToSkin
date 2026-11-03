@@ -28,6 +28,11 @@ The first concern picks the treatment; options are tried in order until one fits
 | Flaky or peeling patches | Barrier repair only: ceramide serum or none; no acids or retinoids | AAD dry-skin and eczema advice: fragrance-free, gentle care, see a dermatologist [10][11]. Always shows the dermatologist note. |
 | Oiliness & pores | 1. Niacinamide 2. BHA | Niacinamide 2-5% reduced sebum in small trials, mixed by population: **Limited** [6]; salicylic acid: **Moderate** [1]. |
 
+A treatment counts as a hydrating or soothing one (hyaluronic acid, ceramides, centella, peptides) only if none of
+its main actives is an exfoliant (AHA, BHA), a retinoid or benzoyl peroxide. Product rule (author's decision): e.g.
+The Ordinary Lactic Acid 10% + HA is an AHA treatment, not a hyaluronic acid one, so a dry-skin user asking about
+dryness never gets an exfoliant as their "hydrating" step.
+
 ## 2. Filters applied to every step
 
 | Rule | Applies when | Evidence |

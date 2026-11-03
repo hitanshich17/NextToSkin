@@ -50,6 +50,10 @@ public final class RoutineRules {
 
     private static final Set<IngredientTag> FRAGRANCE_FAMILY = EnumSet.of(FRAGRANCE, FRAGRANCE_ALLERGEN, ESSENTIAL_OIL);
     private static final Set<IngredientTag> EXFOLIANTS = EnumSet.of(AHA, BHA);
+    /** Hydrating and soothing treatment actives (author's decision, docs/routine-rules.md section 1)... */
+    static final Set<IngredientTag> GENTLE_ACTIVES = EnumSet.of(HYALURONIC_ACID, CERAMIDE, CENTELLA, PEPTIDE);
+    /** ...which a product with any of these as a main active never counts as. */
+    static final Set<IngredientTag> STRONG_ACTIVES = EnumSet.of(AHA, BHA, RETINOID, BENZOYL_PEROXIDE);
 
     /** Sunscreens at or above this SPF rank first where the UV index is very high. */
     static final int HIGH_UV_MIN_SPF = 50;
@@ -93,6 +97,8 @@ public final class RoutineRules {
         for (IngredientTag active : treatmentActivesInOrder(catalog, allowed)) {
             List<RoutineProduct> matching = inCategory(allowed, "treatment").stream()
                     .filter(p -> p.hasMainActive(active))
+                    // e.g. Lactic Acid 10% + HA is an AHA treatment, not a hyaluronic acid one
+                    .filter(p -> !GENTLE_ACTIVES.contains(active) || STRONG_ACTIVES.stream().noneMatch(p::hasMainActive))
                     .filter(this::treatmentIsSuitable)
                     .toList();
             if (!matching.isEmpty()) {
