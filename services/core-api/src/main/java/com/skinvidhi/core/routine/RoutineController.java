@@ -64,7 +64,7 @@ public class RoutineController {
             routine.picks().forEach((step, pick) -> shown.put(step.name(), pick.product().id()));
             sessionId = sessions.save(clientId, answers, climate == null ? Set.of() : climate.signals(), shown);
         }
-        var explanation = explanations.explain(ExplanationFacts.of(answers, routine, climate));
+        var explanation = explanations.explain(ExplanationFacts.of(answers, routine, climate, tried));
         return RoutineResponse.of(routine, climate, sessionId, explanation);
     }
 

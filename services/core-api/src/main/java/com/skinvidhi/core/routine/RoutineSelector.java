@@ -81,7 +81,8 @@ public final class RoutineSelector {
                     .limit(ALTERNATIVES)
                     .toList();
             boolean isOwned = owned.contains(product);
-            picks.put(step, new Routine.Pick(product, isOwned ? List.of() : cheaper, isOwned));
+            boolean swapped = index > 0; // only the budget moves a step off its best match
+            picks.put(step, new Routine.Pick(product, isOwned ? List.of() : cheaper, isOwned, swapped));
         });
 
         List<Note> notes = new ArrayList<>(planNotes);

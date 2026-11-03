@@ -5,6 +5,7 @@ Safety notes are shown on the page word for word, so the LLM is told to leave th
 Its answer is checked before use, and core-api falls back to a template explanation otherwise.
 """
 
+import difflib
 import json
 import re
 
@@ -19,6 +20,7 @@ class StepFacts(BaseModel):
     product: str  # brand and name
     key_ingredients: list[str] = Field(default_factory=list, alias="keyIngredients")
     already_owned: bool = Field(default=False, alias="alreadyOwned")
+    reasons: list[str] = Field(default_factory=list)  # why it won its step, in the rules' own words
 
 
 class ExplanationFacts(BaseModel):
@@ -57,15 +59,23 @@ ROLES = {
     "urea": "softens dry, rough skin",
 }
 
+# Unambiguous wording, so "a little" isn't retold as "new to actives".
+EXPERIENCE = {
+    "never": "Has never used actives such as retinoids or acids",
+    "a little": "Has used actives such as retinoids or acids a little (not new to them)",
+    "regularly": "Uses actives such as retinoids or acids regularly",
+}
+
 SYSTEM_PROMPT = """You write a short explanation of a skincare routine that a rules engine has already chosen, for a \
 general US audience, in plain, friendly American English.
 
-Explain why: why the night treatment fits the main concern, and how the person's profile, things they avoid, \
-budget and climate shaped the other picks.
+Explain why: why the night treatment fits the main concern, and why the other products were picked.
 
 Rules:
 - Every statement must come from the facts you are given. Describe an ingredient only with its role from \
 "ingredient roles"; never add other benefits, side effects or advice.
+- Give each product only the reasons listed for it. If a product has no reasons, name it without saying why, \
+or leave it out. Never describe how a product feels, cleans or protects beyond its reasons.
 - Describe the person only with the profile lines given; don't add traits.
 - Name products exactly as given. Never name any other product or brand.
 - Safety notes (sun sensitivity, sunscreen reapplication, how often to use a product, pregnancy) are shown to the \
@@ -86,10 +96,20 @@ SAFETY_NOTE_TOPICS = re.compile(
 REACTIVE_WORDS = re.compile(r"\b(sensitive|reactive|sensitivity|reactivity)\b", re.IGNORECASE)
 LINK = re.compile(r"https?://|www\.", re.IGNORECASE)
 SENTENCE_END = re.compile(r"[.!?](\s|$)")
+WORD = re.compile(r"[A-Za-z][A-Za-z'-]{3,}")
 
 
 class InvalidExplanation(Exception):
     pass
+
+
+def misspelled_product_word(text: str, facts: ExplanationFacts) -> str | None:
+    """A word that is almost, but not exactly, a word of a product name (e.g. "Neutrogela"); users search for these."""
+    name_words = {w for s in facts.steps for w in WORD.findall(s.product)}
+    for word in set(WORD.findall(text)) - name_words:
+        if word[0].isupper() and difflib.get_close_matches(word, name_words, n=1, cutoff=0.8):
+            return word
+    return None
 
 
 def user_message(facts: ExplanationFacts) -> str:
@@ -99,7 +119,7 @@ def user_message(facts: ExplanationFacts) -> str:
         f"Main concern: {facts.concerns[0]}",
         *([f"Second concern: {facts.concerns[1]}"] if len(facts.concerns) > 1 else []),
         f"Reacts to new products: {facts.reactivity}",
-        f"Has used actives such as retinoids or acids: {facts.actives_experience}",
+        EXPERIENCE.get(facts.actives_experience, f"Experience with actives: {facts.actives_experience}"),
         *([f"Avoids: {', '.join(facts.avoid)}"] if facts.avoid else []),
         *([f"Climate where they live: {', '.join(facts.climate)}"] if facts.climate else []),
         *([f"Left out because of past reactions: {', '.join(facts.avoided_for_you)}"] if facts.avoided_for_you else []),
@@ -142,5 +162,7 @@ def check(text: str, facts: ExplanationFacts) -> None:
         raise InvalidExplanation(f"calls skin {match.group(0)} that rarely reacts")
     if LINK.search(text):
         raise InvalidExplanation("contains a link")
+    if typo := misspelled_product_word(text, facts):
+        raise InvalidExplanation(f"misspelled product name: {typo}")
     if "\n-" in text or text.lstrip().startswith(("-", "*", "#")):
         raise InvalidExplanation("not a paragraph")

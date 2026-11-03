@@ -32,15 +32,17 @@ public record Routine(Map<Step, Pick> picks, IngredientTag treatmentActive, int 
     /**
      * @param cheaperAlternatives other products for this step that cost less, best match first
      * @param owned a product the client liked: kept in its step, $0 in the upfront total
+     * @param cheaperForBudget the step's best match was swapped for this cheaper one to fit the budget
      */
-    public record Pick(RoutineProduct product, List<RoutineProduct> cheaperAlternatives, boolean owned) {
+    public record Pick(RoutineProduct product, List<RoutineProduct> cheaperAlternatives, boolean owned,
+                       boolean cheaperForBudget) {
 
         public Pick {
             cheaperAlternatives = List.copyOf(cheaperAlternatives);
         }
 
         public Pick(RoutineProduct product, List<RoutineProduct> cheaperAlternatives) {
-            this(product, cheaperAlternatives, false);
+            this(product, cheaperAlternatives, false, false);
         }
     }
 }

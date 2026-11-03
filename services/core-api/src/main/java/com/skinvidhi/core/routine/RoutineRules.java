@@ -316,14 +316,20 @@ public final class RoutineRules {
 
     /** How well a moisturizer fits the answers, before price. */
     private Comparator<RoutineProduct> moisturizerFit() {
+        Texture wanted = moisturizerTexture();
+        return Comparator.comparing(p -> wanted != null && p.texture() != wanted);
+    }
+
+    /** Skin type decides; climate only when skin type has no say (normal, not sure). Null: no preference. */
+    private Texture moisturizerTexture() {
         Texture wanted = textureForSkinType();
-        if (wanted == null && climateHas(Signal.HUMID)) { // skin type wins; climate decides only if it has no say
-            wanted = Texture.LIGHT;
-        } else if (wanted == null && climateHas(Signal.DRY_AIR)) {
-            wanted = Texture.RICH;
+        if (wanted == null && climateHas(Signal.HUMID)) {
+            return Texture.LIGHT;
         }
-        Texture finalWanted = wanted;
-        return Comparator.comparing(p -> finalWanted != null && p.texture() != finalWanted);
+        if (wanted == null && climateHas(Signal.DRY_AIR)) {
+            return Texture.RICH;
+        }
+        return wanted;
     }
 
     /**
@@ -359,17 +365,104 @@ public final class RoutineRules {
                 .filter(p -> p.spf() != null && p.spf() >= 30)
                 .filter(p -> !retinoidNight || EXFOLIANTS.stream().noneMatch(p::hasMainActive))
                 .toList();
-        boolean mineralPreferred = answers.pregnant() || answers.has(Concern.REDNESS)
-                || answers.has(Concern.FLAKY_PATCHES) || answers.reactivity() == Reactivity.OFTEN;
-        if (mineralPreferred && sunscreens.stream().anyMatch(RoutineProduct::mineral)) {
+        if (mineralPreferred() && sunscreens.stream().anyMatch(RoutineProduct::mineral)) {
             sunscreens = sunscreens.stream().filter(RoutineProduct::mineral).toList();
         }
-        boolean tintPreferred = answers.has(Concern.DARK_SPOTS) || answers.has(Concern.UNEVEN_TONE)
-                || (answers.skinTone() != null && answers.skinTone() >= 4);
+        boolean tintPreferred = tintPreferred();
         Comparator<RoutineProduct> tintFirst = Comparator.comparing(p -> !(tintPreferred && p.tinted()));
         boolean highUv = climateHas(Signal.HIGH_UV);
         Comparator<RoutineProduct> highSpfFirst = Comparator.comparing(p -> highUv && p.spf() < HIGH_UV_MIN_SPF);
         return rank(sunscreens, highSpfFirst.thenComparing(tintFirst).thenComparing(similarityThenPrice()));
+    }
+
+    private boolean mineralPreferred() {
+        return answers.pregnant() || answers.has(Concern.REDNESS) || answers.has(Concern.FLAKY_PATCHES)
+                || answers.reactivity() == Reactivity.OFTEN;
+    }
+
+    private boolean tintPreferred() {
+        return answers.has(Concern.DARK_SPOTS) || answers.has(Concern.UNEVEN_TONE)
+                || (answers.skinTone() != null && answers.skinTone() >= 4);
+    }
+
+    // ---- Why a product won its step (for the explanation) ----
+
+    /**
+     * The reasons a product ranks high in its step, in fixed phrases. Each one mirrors a ranking rule above, so the
+     * explanation can only say what the rules actually used. Never mentions pregnancy (it isn't sent to the LLM).
+     */
+    public static List<String> reasons(QuizAnswers answers, Climate climate, TriedProducts tried, Step step,
+                                       RoutineProduct p) {
+        return new RoutineRules(answers, climate, tried).reasonsFor(step, p);
+    }
+
+    private List<String> reasonsFor(Step step, RoutineProduct p) {
+        List<String> reasons = new ArrayList<>();
+        if (tried.likes(p)) {
+            reasons.add("you said you liked it");
+        }
+        switch (step.category()) {
+            case "treatment" -> {
+                if (answers.concerns().size() > 1) {
+                    Concern second = answers.concerns().get(1);
+                    if (TREATMENTS.get(second).stream().anyMatch(p::hasMainActive)) {
+                        reasons.add("also helps with " + second.label());
+                    }
+                }
+            }
+            case "cleanser" -> {
+                if (answers.has(Concern.BREAKOUTS) && p.hasMainActive(BENZOYL_PEROXIDE)) {
+                    reasons.add("has benzoyl peroxide for breakouts");
+                } else if (answers.has(Concern.BREAKOUTS) && p.hasMainActive(BHA)) {
+                    reasons.add("has salicylic acid for breakouts");
+                }
+                Texture wanted = textureForSkinType();
+                if (wanted != null && p.texture() == wanted) {
+                    reasons.add(texture(wanted) + " texture for " + words(answers.skinType()) + " skin");
+                }
+            }
+            case "moisturizer" -> {
+                Texture wanted = moisturizerTexture();
+                if (wanted != null && p.texture() == wanted) {
+                    reasons.add(texture(wanted) + " texture for " + (textureForSkinType() != null
+                            ? words(answers.skinType()) + " skin"
+                            : wanted == Texture.LIGHT ? "the humid air where you live" : "the dry air where you live"));
+                }
+            }
+            case "sunscreen" -> {
+                if (climateHas(Signal.HIGH_UV) && p.spf() != null && p.spf() >= HIGH_UV_MIN_SPF) {
+                    reasons.add("SPF " + p.spf() + " for the very strong sun where you live");
+                }
+                if (mineralPreferred() && p.mineral()) {
+                    if (answers.has(Concern.REDNESS)) {
+                        reasons.add("mineral filters, gentler on redness");
+                    } else if (answers.has(Concern.FLAKY_PATCHES)) {
+                        reasons.add("mineral filters, gentler on flaky patches");
+                    } else if (answers.reactivity() == Reactivity.OFTEN) {
+                        reasons.add("mineral filters, gentler on skin that reacts often");
+                    } else {
+                        reasons.add("mineral filters"); // the only cause is private (pregnancy)
+                    }
+                }
+                if (tintPreferred() && p.tinted()) {
+                    reasons.add("tinted with iron oxides, which also block the visible light that can darken spots");
+                }
+            }
+            default -> {
+            }
+        }
+        if (tried.similarityTo(p) >= 0.3) {
+            reasons.add("similar to products you liked");
+        }
+        return reasons;
+    }
+
+    private static String texture(Texture t) {
+        return t == Texture.LIGHT ? "light" : "rich";
+    }
+
+    private static String words(Enum<?> value) {
+        return value.name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
     }
 
     // ---- Helpers ----

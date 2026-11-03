@@ -154,4 +154,21 @@ class ExplanationTest {
         assertThat(explanation.text()).startsWith("This routine is built for dry skin");
         verify(cache, never()).set(anyString(), anyString(), org.mockito.ArgumentMatchers.any(java.time.Duration.class));
     }
+
+    @Test
+    void aBudgetSwapIsAReason() {
+        // Dark spots prefer a tinted sunscreen, so the tinted EltaMD ranks first.
+        var answers = new QuizAnswers(SkinType.NORMAL, List.of(Concern.REDNESS, Concern.DARK_SPOTS),
+                Reactivity.RARELY, Set.of(), ActivesExperience.A_LITTLE, Pregnancy.NO, null, null, null);
+        var cheapSpf = p("cheap-mineral-spf", "Brand", "sunscreen", 30, 1000);
+        var catalog = new java.util.ArrayList<>(CATALOG);
+        catalog.add(cheapSpf);
+        // 1500 + 1200 + 1400 + 4000 = $81 with the EltaMD; a $75 budget forces the cheaper sunscreen.
+        Routine routine = RoutineSelector.select(RoutineRules.plan(answers, catalog, null), 7500);
+        ExplanationFacts facts = ExplanationFacts.of(answers, routine, null);
+
+        var sunscreen = facts.steps().stream().filter(s -> s.step().equals("sunscreen")).findFirst().orElseThrow();
+        assertThat(sunscreen.product()).isEqualTo("Brand cheap-mineral-spf");
+        assertThat(sunscreen.reasons()).contains("a cheaper option, picked to fit your budget");
+    }
 }

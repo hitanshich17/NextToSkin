@@ -313,4 +313,66 @@ class RoutineRulesTest {
         var withoutHa = RoutineRules.plan(dryness, List.of(lacticWithHa, GENTLE_CLEANSER, RICH_CREAM, MINERAL_SPF));
         assertThat(withoutHa.candidates().get(Step.PM_TREATMENT)).doesNotContain(lacticWithHa);
     }
+
+    // ---- Reasons for the explanation: each mirrors a ranking rule ----
+
+    private static List<String> reasons(QuizAnswers answers, com.skinvidhi.core.climate.Climate climate, Step step,
+                                        RoutineProduct p) {
+        return RoutineRules.reasons(answers, climate, TriedProducts.NONE, step, p);
+    }
+
+    @Test
+    void cleanserReasons() {
+        var oilyBreakouts = answers(SkinType.OILY, List.of(Concern.BREAKOUTS), Reactivity.RARELY, Set.of(),
+                ActivesExperience.A_LITTLE, Pregnancy.NO, null);
+        assertThat(reasons(oilyBreakouts, null, Step.AM_CLEANSER, BP_CLEANSER))
+                .containsExactly("has benzoyl peroxide for breakouts");
+        var foam = p("foam-cleanser", "cleanser", 900);
+        assertThat(reasons(oilyBreakouts, null, Step.AM_CLEANSER, foam)).containsExactly("light texture for oily skin");
+    }
+
+    @Test
+    void moisturizerTextureReasonNamesSkinTypeOrClimate() {
+        var dry = answers(SkinType.DRY, List.of(Concern.DRYNESS), Reactivity.RARELY, Set.of(),
+                ActivesExperience.A_LITTLE, Pregnancy.NO, null);
+        assertThat(reasons(dry, null, Step.AM_MOISTURIZER, RICH_CREAM)).containsExactly("rich texture for dry skin");
+        assertThat(reasons(simple(Concern.DULLNESS), HUMID, Step.AM_MOISTURIZER, LIGHT_GEL))
+                .containsExactly("light texture for the humid air where you live");
+        assertThat(reasons(simple(Concern.DULLNESS), null, Step.AM_MOISTURIZER, LIGHT_GEL)).isEmpty();
+    }
+
+    @Test
+    void sunscreenReasons() {
+        var redness = answers(SkinType.NORMAL, List.of(Concern.REDNESS, Concern.DARK_SPOTS), Reactivity.RARELY,
+                Set.of(), ActivesExperience.A_LITTLE, Pregnancy.NO, null);
+        var tintedMineral50 = spf("tinted-mineral", 50, 3000, IRON_OXIDE, 8);
+        assertThat(reasons(redness, SUNNY_SMOGGY, Step.AM_SUNSCREEN, tintedMineral50)).containsExactly(
+                "SPF 50 for the very strong sun where you live",
+                "mineral filters, gentler on redness",
+                "tinted with iron oxides, which also block the visible light that can darken spots");
+    }
+
+    @Test
+    void pregnancyIsNeverAReasonInWords() {
+        var pregnant = answers(SkinType.NORMAL, List.of(Concern.DULLNESS), Reactivity.RARELY, Set.of(),
+                ActivesExperience.A_LITTLE, Pregnancy.YES, null);
+        assertThat(reasons(pregnant, null, Step.AM_SUNSCREEN, MINERAL_SPF)).containsExactly("mineral filters");
+    }
+
+    @Test
+    void treatmentReasonNamesTheSecondConcernItAlsoHelps() {
+        var breakoutsAndDarkSpots = answers(SkinType.NORMAL, List.of(Concern.BREAKOUTS, Concern.DARK_SPOTS),
+                Reactivity.RARELY, Set.of(), ActivesExperience.A_LITTLE, Pregnancy.NO, null);
+        assertThat(reasons(breakoutsAndDarkSpots, null, Step.PM_TREATMENT, AZELAIC))
+                .containsExactly("also helps with dark spots and marks");
+    }
+
+    @Test
+    void likedAndSimilarAreReasonsToo() {
+        var tried = new TriedProducts(Set.of("water-gel"), Map.of(), Map.of("rich-cream", 0.6));
+        assertThat(RoutineRules.reasons(simple(Concern.DULLNESS), null, tried, Step.AM_MOISTURIZER, LIGHT_GEL))
+                .containsExactly("you said you liked it");
+        assertThat(RoutineRules.reasons(simple(Concern.DULLNESS), null, tried, Step.AM_MOISTURIZER, RICH_CREAM))
+                .containsExactly("similar to products you liked");
+    }
 }

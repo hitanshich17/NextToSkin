@@ -9,6 +9,8 @@ import com.skinvidhi.core.routine.Routine;
 import com.skinvidhi.core.routine.RoutinePlan.Note;
 import com.skinvidhi.core.routine.RoutinePlan.Step;
 import com.skinvidhi.core.routine.RoutineProduct;
+import com.skinvidhi.core.routine.RoutineRules;
+import com.skinvidhi.core.routine.TriedProducts;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -25,16 +27,10 @@ public record ExplanationFacts(String skinType, List<String> concerns, String re
                                boolean treatmentChangedForBudget, List<StepFacts> steps, List<String> avoidedForYou,
                                List<String> notes, boolean withinBudget) {
 
+    /** @param reasons why this product won its step, in the rules' own words (RoutineRules.reasons) */
     public record StepFacts(String time, String step, String product, List<String> keyIngredients,
-                            boolean alreadyOwned) {
+                            boolean alreadyOwned, List<String> reasons) {
     }
-
-    static final Map<QuizAnswers.Concern, String> CONCERNS = Map.of(
-            QuizAnswers.Concern.BREAKOUTS, "breakouts", QuizAnswers.Concern.DARK_SPOTS, "dark spots and marks",
-            QuizAnswers.Concern.UNEVEN_TONE, "uneven tone", QuizAnswers.Concern.FINE_LINES, "fine lines",
-            QuizAnswers.Concern.REDNESS, "redness", QuizAnswers.Concern.DULLNESS, "dullness and texture",
-            QuizAnswers.Concern.DRYNESS, "dryness", QuizAnswers.Concern.FLAKY_PATCHES, "flaky patches",
-            QuizAnswers.Concern.OILINESS, "oiliness and pores");
 
     static final Map<QuizAnswers.Avoid, String> AVOID = Map.of(
             QuizAnswers.Avoid.FRAGRANCE, "fragrance", QuizAnswers.Avoid.ESSENTIAL_OILS, "essential oils",
@@ -61,16 +57,24 @@ public record ExplanationFacts(String skinType, List<String> concerns, String re
     private static final Set<Note> PRIVATE_NOTES = Set.of(Note.NO_RETINOIDS_IN_PREGNANCY);
 
     public static ExplanationFacts of(QuizAnswers answers, Routine routine, Climate climate) {
+        return of(answers, routine, climate, TriedProducts.NONE);
+    }
+
+    public static ExplanationFacts of(QuizAnswers answers, Routine routine, Climate climate, TriedProducts tried) {
         List<StepFacts> steps = new ArrayList<>();
         Arrays.stream(Step.values()).filter(routine.picks()::containsKey).forEach(step -> {
             Routine.Pick pick = routine.picks().get(step);
             RoutineProduct p = pick.product();
+            List<String> reasons = new ArrayList<>(RoutineRules.reasons(answers, climate, tried, step, p));
+            if (pick.cheaperForBudget()) {
+                reasons.add("a cheaper option, picked to fit your budget");
+            }
             steps.add(new StepFacts(step.name().substring(0, 2), step.category(), p.brand() + " " + p.name(),
-                    keyIngredients(p), pick.owned()));
+                    keyIngredients(p), pick.owned(), reasons));
         });
         return new ExplanationFacts(
                 words(answers.skinType()),
-                answers.concerns().stream().map(CONCERNS::get).toList(),
+                answers.concerns().stream().map(QuizAnswers.Concern::label).toList(),
                 words(answers.reactivity()),
                 answers.avoid().stream().map(AVOID::get).sorted().toList(),
                 words(answers.activesExperience()),

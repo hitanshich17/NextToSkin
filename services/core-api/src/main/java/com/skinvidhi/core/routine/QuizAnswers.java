@@ -18,7 +18,20 @@ public record QuizAnswers(
     public enum SkinType { OILY, DRY, COMBINATION, NORMAL, NOT_SURE }
 
     public enum Concern {
-        BREAKOUTS, DARK_SPOTS, UNEVEN_TONE, FINE_LINES, REDNESS, DULLNESS, DRYNESS, FLAKY_PATCHES, OILINESS
+        BREAKOUTS("breakouts"), DARK_SPOTS("dark spots and marks"), UNEVEN_TONE("uneven tone"),
+        FINE_LINES("fine lines"), REDNESS("redness"), DULLNESS("dullness and texture"), DRYNESS("dryness"),
+        FLAKY_PATCHES("flaky patches"), OILINESS("oiliness and pores");
+
+        private final String label;
+
+        Concern(String label) {
+            this.label = label;
+        }
+
+        /** How the concern reads in a sentence. */
+        public String label() {
+            return label;
+        }
     }
 
     public enum Reactivity { RARELY, SOMETIMES, OFTEN }

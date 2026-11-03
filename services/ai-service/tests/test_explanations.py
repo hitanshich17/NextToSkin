@@ -10,11 +10,12 @@ FACTS = {
     "concerns": ["breakouts", "dark spots and marks"],
     "reactivity": "SOMETIMES",
     "avoid": [],
-    "activesExperience": "A_LITTLE",
+    "activesExperience": "a little",
     "climate": ["dry air"],
     "treatmentActive": "a retinoid",
     "steps": [
-        {"time": "AM", "step": "cleanser", "product": "Senka Perfect Whip", "keyIngredients": []},
+        {"time": "AM", "step": "cleanser", "product": "Senka Perfect Whip", "keyIngredients": [],
+         "reasons": ["light texture for oily skin"]},
         {"time": "PM", "step": "treatment", "product": "The INKEY List Starter Retinol Serum",
          "keyIngredients": ["a retinoid"]},
     ],
@@ -63,6 +64,8 @@ def test_sends_only_the_facts():
     assert '"a retinoid": "one of the best-studied ingredients' in user  # roles come from us, not the LLM
     assert "pregnan" not in user.lower()
     assert "every other night" not in user.lower()  # notes are shown on the page, never sent
+    assert "light texture for oily skin" in user  # each pick's reasons come from the rules
+    assert "a little (not new to them)" in user
 
 
 def test_no_llm_configured_is_503():
@@ -115,3 +118,13 @@ def test_calling_skin_sensitive_when_it_rarely_reacts_is_rejected():
 def test_more_than_four_sentences_is_rejected():
     use(FakeLlm(answer=GOOD + " One. Two. Three."))
     assert client.post("/explanations", json=FACTS).status_code == 503
+
+
+def test_a_misspelled_product_name_is_rejected():
+    use(FakeLlm(answer=GOOD.replace("Senka Perfect Whip", "Senka Perfekt Whip") + " Senka Perfekt Whip cleanses."))
+    assert client.post("/explanations", json=FACTS).status_code == 503
+
+
+def test_exact_product_names_and_ordinary_words_pass():
+    use(FakeLlm(answer=GOOD + " Senka Perfect Whip cleanses morning and night."))
+    assert client.post("/explanations", json=FACTS).status_code == 200
