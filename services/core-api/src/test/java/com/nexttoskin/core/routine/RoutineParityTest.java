@@ -87,9 +87,24 @@ class RoutineParityTest {
         if (Boolean.getBoolean("parity.export")) {
             Files.writeString(GOLDEN, generated + "\n");
         }
-        assertThat(Files.readString(GOLDEN).strip())
-                .as("testdata/routine-parity.json is out of date: regenerate it with -Dparity.export=true")
-                .isEqualTo(generated.strip());
+        var stored = json.readTree(Files.readString(GOLDEN));
+        var current = json.readTree(generated);
+        // pgvector sums float32 values with CPU-specific instructions, so the last digit of a similarity score can
+        // differ between machines (ARM laptop vs x86 CI): compare those with a tolerance, everything else exactly.
+        var storedScores = ((com.fasterxml.jackson.databind.node.ObjectNode) stored).remove("similarityCases");
+        var currentScores = ((com.fasterxml.jackson.databind.node.ObjectNode) current).remove("similarityCases");
+        assertThat(stored).as("testdata/routine-parity.json is out of date: regenerate it with -Dparity.export=true")
+                .isEqualTo(current);
+        assertThat(storedScores.size()).isEqualTo(currentScores.size());
+        for (int i = 0; i < storedScores.size(); i++) {
+            assertThat(storedScores.get(i).get("feedback")).isEqualTo(currentScores.get(i).get("feedback"));
+            var want = storedScores.get(i).get("scores");
+            var got = currentScores.get(i).get("scores");
+            assertThat(got.size()).isEqualTo(want.size());
+            want.fields().forEachRemaining(e -> assertThat(got.get(e.getKey()).asDouble())
+                    .as("similarity case %s, %s", e.getKey())
+                    .isCloseTo(e.getValue().asDouble(), org.assertj.core.data.Offset.offset(1e-5)));
+        }
     }
 
     private Map<String, Object> golden(List<RoutineProduct> catalog) {
