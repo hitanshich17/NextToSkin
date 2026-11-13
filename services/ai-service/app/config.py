@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # Versioned event schemas shared with the catalog service (repo root schemas/, copied into the image).
     schemas_dir: str = Field(default_factory=lambda: _find_schemas_dir())
 
+    # Climate (Open-Meteo, cached in Redis; docs/routine-rules.md section 6)
+    redis_url: str = "redis://localhost:6379/0"
+    open_meteo_geocoding_url: str = "https://geocoding-api.open-meteo.com/v1/search"
+    open_meteo_forecast_url: str = "https://api.open-meteo.com/v1/forecast"
+    open_meteo_air_quality_url: str = "https://air-quality-api.open-meteo.com/v1/air-quality"
+    open_meteo_timeout_seconds: float = 5.0
+
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm_api_key)
