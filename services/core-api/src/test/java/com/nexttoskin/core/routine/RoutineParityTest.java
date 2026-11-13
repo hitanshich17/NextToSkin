@@ -46,6 +46,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class RoutineParityTest {
 
+    // Covers the rules (RoutineRules) and the budget fit (RoutineSelector, MonthlyCost).
     static final Path GOLDEN = Path.of("../../testdata/routine-parity.json");
     static final int CASES = 500;
 
@@ -130,6 +131,13 @@ class RoutineParityTest {
             expected.put("budgetFallbackOrder", plan.budgetFallbacks().keySet().stream().map(Enum::name).toList());
             expected.put("owned", plan.owned().stream().map(RoutineProduct::id).sorted().toList());
             expected.put("avoided", plan.avoided());
+            // Budget fit on the same plan: no limit, and a budget drawn from the slider's range.
+            Integer budget = pick(random, List.of(3000, 4000, 5000, 6000, 8000, 12000));
+            List<Map<String, Object>> routines = new ArrayList<>();
+            for (Integer b : java.util.Arrays.asList(null, budget)) {
+                routines.add(routineJson(RoutineSelector.select(plan, b)));
+            }
+            expected.put("routines", routines);
 
             Map<String, Object> c = new LinkedHashMap<>();
             c.put("answers", answersJson(answers));
@@ -191,6 +199,28 @@ class RoutineParityTest {
         }).toList());
         out.put("similarity", similarity);
         return TriedProducts.from(feedback, similarity);
+    }
+
+    private static Map<String, Object> routineJson(Routine r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        Map<String, Object> picks = new LinkedHashMap<>();
+        r.picks().entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(e -> {
+            Map<String, Object> pick = new LinkedHashMap<>();
+            pick.put("product", e.getValue().product().id());
+            pick.put("cheaper", ids(e.getValue().cheaperAlternatives()));
+            pick.put("owned", e.getValue().owned());
+            pick.put("cheaperForBudget", e.getValue().cheaperForBudget());
+            picks.put(e.getKey().name(), pick);
+        });
+        m.put("budgetCents", r.budgetCents());
+        m.put("picks", picks);
+        m.put("treatmentActive", r.treatmentActive() == null ? null : r.treatmentActive().name());
+        m.put("totalCents", r.totalCents());
+        m.put("monthlyCents", r.monthlyCents());
+        m.put("withinBudget", r.withinBudget());
+        m.put("notes", r.notes().stream().map(Enum::name).toList());
+        m.put("avoided", r.avoided());
+        return m;
     }
 
     private static Map<String, Object> answersJson(QuizAnswers a) {

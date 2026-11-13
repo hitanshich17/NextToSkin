@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from app.recommender import rules
+from app.recommender import rules, selector
 from app.recommender.models import (
     ROUTINE_CATEGORIES, Climate, Product, QuizAnswers, Reason, Step, TriedProducts,
 )
@@ -66,3 +66,21 @@ def test_same_plan_as_java(index):
     for step_name, reasons in expected["reasons"].items():
         step = Step(step_name)
         assert rules.reasons(answers, weather, feedback, step, plan.candidates[step][0]) == reasons, step_name
+    for want in expected["routines"]:
+        routine = selector.select(plan, want["budgetCents"])
+        assert routine_json(routine) == want, f"budget {want['budgetCents']}"
+
+
+def routine_json(r: selector.Routine) -> dict:
+    return {
+        "budgetCents": r.budget_cents,
+        "picks": {step.value: {"product": pick.product.id, "cheaper": [p.id for p in pick.cheaper_alternatives],
+                               "owned": pick.owned, "cheaperForBudget": pick.cheaper_for_budget}
+                  for step, pick in r.picks.items()},
+        "treatmentActive": r.treatment_active,
+        "totalCents": r.total_cents,
+        "monthlyCents": r.monthly_cents,
+        "withinBudget": r.within_budget,
+        "notes": [n.value for n in r.notes],
+        "avoided": r.avoided,
+    }
