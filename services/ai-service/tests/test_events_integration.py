@@ -12,7 +12,8 @@ from app.config import get_settings
 from confluent_kafka.admin import AdminClient, NewTopic
 
 from app.events.consumer import ProductEventsConsumer
-from app.events.read_model import ReadModel, ensure_database
+from app.db import Database, ensure_database
+from app.events.read_model import ReadModel
 from app.events.schemas import load_schemas
 from tests.conftest import encode, make_event, needs_docker
 
@@ -23,7 +24,7 @@ SCHEMAS = load_schemas(get_settings().schemas_dir, "product-updated")
 def fresh_read_model(postgres_url: str) -> ReadModel:
     url = psycopg.conninfo.make_conninfo(postgres_url, dbname=f"rec_{uuid.uuid4().hex[:8]}")
     ensure_database(url)
-    return ReadModel(url)
+    return ReadModel(Database(url))
 
 
 def new_topic(bootstrap: str) -> str:

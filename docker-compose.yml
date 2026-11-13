@@ -87,7 +87,7 @@ services:
       LLM_EFFORT: ${LLM_EFFORT:-low}
       LLM_THINKING: ${LLM_THINKING:-disabled}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      READ_MODEL_URL: postgresql://${POSTGRES_USER:-skinvidhi}:${POSTGRES_PASSWORD:-skinvidhi_dev_password}@postgres:5432/recommender
+      DATABASE_URL: postgresql://${POSTGRES_USER:-skinvidhi}:${POSTGRES_PASSWORD:-skinvidhi_dev_password}@postgres:5432/recommender
       REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"

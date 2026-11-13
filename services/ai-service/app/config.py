@@ -34,8 +34,9 @@ class Settings(BaseSettings):
 
     # Catalog events (docs/events.md). Empty bootstrap servers: no consumer (e.g. unit tests).
     kafka_bootstrap_servers: str = ""
-    # The recommender's own database, created on startup if missing.
-    read_model_url: str = "postgresql://skinvidhi:skinvidhi_dev_password@localhost:5432/recommender"
+    # The recommender's own database (read model, feedback, vectors), created and migrated on startup.
+    # Empty: no database (e.g. unit tests).
+    database_url: str = ""
     # Versioned event schemas shared with the catalog service (repo root schemas/, copied into the image).
     schemas_dir: str = Field(default_factory=lambda: _find_schemas_dir())
 

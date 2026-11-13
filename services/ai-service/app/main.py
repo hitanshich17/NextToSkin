@@ -12,9 +12,12 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, HTTPException
 
 from app.config import Settings, get_settings
+from app.db import Database, ensure_database
 from app.events.consumer import ProductEventsConsumer
-from app.events.read_model import ReadModel, ensure_database
+from app.events.read_model import ReadModel
 from app.events.schemas import load_schemas
+from app.feedback.api import router as feedback_router
+from app.feedback.store import FeedbackStore
 from app.explain import ExplanationFacts, InvalidExplanation, explain
 from app.llm import AnthropicLlm, Llm, LlmError
 
@@ -24,14 +27,18 @@ consumer: ProductEventsConsumer | None = None
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
-    """Starts the catalog-events consumer in a background thread when Kafka is configured."""
+async def lifespan(app: FastAPI):
+    """Opens the recommender's database and starts the catalog-events consumer when they're configured."""
     global consumer
     settings = get_settings()
-    thread = None
-    if settings.kafka_bootstrap_servers:
-        ensure_database(settings.read_model_url)
-        consumer = ProductEventsConsumer(settings.kafka_bootstrap_servers, ReadModel(settings.read_model_url),
+    thread, db = None, None
+    if settings.database_url:
+        ensure_database(settings.database_url)
+        db = Database(settings.database_url)
+        app.state.read_model = ReadModel(db)
+        app.state.feedback_store = FeedbackStore(db)
+    if settings.kafka_bootstrap_servers and db is not None:
+        consumer = ProductEventsConsumer(settings.kafka_bootstrap_servers, app.state.read_model,
                                          load_schemas(settings.schemas_dir, "product-updated"))
         thread = threading.Thread(target=consumer.run, name="product-events", daemon=True)
         thread.start()
@@ -39,9 +46,12 @@ async def lifespan(_: FastAPI):
     if consumer is not None:
         consumer.stop()
         thread.join(timeout=10)
+    if db is not None:
+        db.close()
 
 
 app = FastAPI(title="NextToSkin AI Service", version="0.1.0", lifespan=lifespan)
+app.include_router(feedback_router)
 
 
 @app.get("/health")
