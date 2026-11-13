@@ -18,6 +18,7 @@ from app.events.read_model import ReadModel
 from app.events.schemas import load_schemas
 from app.feedback.api import router as feedback_router
 from app.feedback.store import FeedbackStore
+from app.similarity.vectors import Vectors
 from app.explain import ExplanationFacts, InvalidExplanation, explain
 from app.llm import AnthropicLlm, Llm, LlmError
 
@@ -37,9 +38,12 @@ async def lifespan(app: FastAPI):
         db = Database(settings.database_url)
         app.state.read_model = ReadModel(db)
         app.state.feedback_store = FeedbackStore(db)
+        app.state.vectors = Vectors(db)
+        app.state.vectors.rebuild_all()
     if settings.kafka_bootstrap_servers and db is not None:
         consumer = ProductEventsConsumer(settings.kafka_bootstrap_servers, app.state.read_model,
-                                         load_schemas(settings.schemas_dir, "product-updated"))
+                                         load_schemas(settings.schemas_dir, "product-updated"),
+                                         on_catalog_changed=app.state.vectors.rebuild_all)
         thread = threading.Thread(target=consumer.run, name="product-events", daemon=True)
         thread.start()
     yield

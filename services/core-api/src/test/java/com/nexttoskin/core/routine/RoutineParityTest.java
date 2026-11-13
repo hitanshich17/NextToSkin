@@ -62,6 +62,12 @@ class RoutineParityTest {
     @Autowired
     private JdbcTemplate jdbc;
 
+    @Autowired
+    private com.nexttoskin.core.feedback.FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private com.nexttoskin.core.similarity.SimilarityRepository similarity;
+
     private final ObjectMapper json = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT)
             .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS);
 
@@ -148,6 +154,7 @@ class RoutineParityTest {
         }
         golden.put("climates", CLIMATES);
         golden.put("cases", cases);
+        golden.put("similarityCases", similarityCases(random, buyable));
         return golden;
     }
 
@@ -199,6 +206,30 @@ class RoutineParityTest {
         }).toList());
         out.put("similarity", similarity);
         return TriedProducts.from(feedback, similarity);
+    }
+
+    /** pgvector similarity scores for random likes and dislikes, from the vectors built at import. */
+    private List<Map<String, Object>> similarityCases(Random random, List<RoutineProduct> buyable) {
+        List<Map<String, Object>> cases = new ArrayList<>();
+        for (int i = 0; i < 25; i++) {
+            java.util.UUID client = new java.util.UUID(20261113L, i);
+            List<Map<String, Object>> feedback = new ArrayList<>();
+            int n = 1 + random.nextInt(4);
+            for (int j = 0; j < n; j++) {
+                String id = buyable.get(random.nextInt(buyable.size())).id();
+                Feedback.Verdict verdict = random.nextBoolean() ? Feedback.Verdict.LIKED : Feedback.Verdict.DISLIKED;
+                feedbackRepository.save(client, new Feedback(id, verdict, null), null);
+                feedback.removeIf(f -> f.get("productId").equals(id)); // a new verdict replaces the old one
+                feedback.add(Map.of("productId", id, "verdict", verdict.name()));
+            }
+            Map<String, Double> scores = new TreeMap<>();
+            similarity.scores(client).forEach((id, score) -> scores.put(id, Math.round(score * 1e6) / 1e6));
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("feedback", feedback);
+            c.put("scores", scores);
+            cases.add(c);
+        }
+        return cases;
     }
 
     private static Map<String, Object> routineJson(Routine r) {

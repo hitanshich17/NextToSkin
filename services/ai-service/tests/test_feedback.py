@@ -155,4 +155,4 @@ def test_migrations_run_once_and_are_recorded(store):
     ensure_database(store.db.url)  # again: nothing to do
     with store.db.transaction() as conn:
         versions = [r[0] for r in conn.execute("SELECT version FROM schema_migrations ORDER BY version")]
-    assert versions == [1, 2]
+    assert versions == [1, 2, 3]

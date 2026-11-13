@@ -55,6 +55,22 @@ MIGRATIONS: list[tuple[int, str, str]] = [
             CHECK (verdict = 'DISLIKED' OR reason IS NULL)
         );
     """),
+    (3, "ingredient vectors for similarity (pgvector)", """
+        CREATE EXTENSION IF NOT EXISTS vector;
+        -- A stable vector dimension for every ingredient name ever seen (cosine similarity only needs the
+        -- numbering to be consistent, not to match the catalog service's ingredient ids).
+        CREATE TABLE ingredient_dims (
+            name TEXT PRIMARY KEY,
+            dim  SERIAL UNIQUE
+        );
+        -- One sparse vector per product: one dimension per ingredient, almost all zeros, so only the label's
+        -- ingredients are stored. No index yet: ~100 products scan instantly; add HNSW when the catalog grows.
+        CREATE TABLE product_vectors (
+            product_id TEXT PRIMARY KEY,
+            embedding  sparsevec(1000000) NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        );
+    """),
 ]
 
 

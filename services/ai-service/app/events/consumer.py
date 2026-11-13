@@ -31,7 +31,7 @@ MAX_OUTAGE_BACKOFF_SECONDS = 30.0
 
 class ProductEventsConsumer:
     def __init__(self, bootstrap_servers: str, read_model: ReadModel, schemas: dict[int, dict],
-                 group: str = GROUP, sleep=time.sleep, topic: str = TOPIC):
+                 group: str = GROUP, sleep=time.sleep, topic: str = TOPIC, on_catalog_changed=None):
         self._consumer = Consumer({
             "bootstrap.servers": bootstrap_servers,
             "group.id": group,
@@ -44,6 +44,10 @@ class ProductEventsConsumer:
         self._sleep = sleep
         self._stop = threading.Event()
         self._topic = topic
+        # Called once the topic goes quiet after products changed (e.g. to rebuild similarity vectors): a catalog
+        # import arrives as a burst of events, and the work is done once for the whole burst.
+        self._on_catalog_changed = on_catalog_changed
+        self._changed = False
         self._dead_letter_topic = topic + ".dlt"
         self.stats = {"applied": 0, "duplicates": 0, "dead_lettered": 0, "retries": 0}
         self.partitions: list[int] = []  # partitions this member of the group currently owns
@@ -70,6 +74,13 @@ class ProductEventsConsumer:
     def poll_once(self, timeout: float = 1.0) -> None:
         message = self._consumer.poll(timeout)
         if message is None:
+            if self._changed and self._on_catalog_changed is not None:
+                self._changed = False
+                try:
+                    self._on_catalog_changed()
+                except Exception as e:  # noqa: BLE001 - retried after the next change
+                    self._changed = True
+                    log.warning("After-change work failed: %s", e)
             return
         if message.error():
             if message.error().code() != KafkaError._PARTITION_EOF:
@@ -94,6 +105,7 @@ class ProductEventsConsumer:
             try:
                 applied = self._read_model.apply(event)
                 self.stats["applied" if applied else "duplicates"] += 1
+                self._changed = self._changed or applied
                 return
             except psycopg.OperationalError as e:
                 # The database is unreachable: not this event's fault. Wait and retry, without giving up.
