@@ -60,6 +60,10 @@ AHAs, irritants, sensitivities). AI/ML is used where it solves a real problem:
   files in schemas/, backward compatible only, checked in CI. Then: Redis cache-aside invalidated by catalog
   events, 3 recommender instances behind Nginx with load tests (report only measured numbers), AWS ECS on one EC2
   instance. Order: Kafka -> recommender move -> Redis -> Nginx/load tests -> AWS.
+  Recommender move: the Python port (services/ai-service/app/recommender/) must match the Java engine exactly.
+  testdata/routine-parity.json (500 generated profiles on the real catalog) is written by core-api's
+  RoutineParityTest (-Dparity.export=true after a deliberate rules change; it fails when stale) and checked by
+  ai-service's test_routine_parity.py. Ties keep catalog order sorted by product id (byte order, COLLATE "C").
 - Sizes: fl oz -> ml, oz -> g; liquids sold in "oz" count as fl oz; creams, balms and sticks keep oz.
 - OTC active ingredients (acne treatments, sunscreens) are stored separately with their percentage.
 - Curated catalog: ~25 products per category; the author approves each list. Claude reads ingredients

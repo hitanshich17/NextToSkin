@@ -36,7 +36,7 @@ public class RoutineCatalog {
                 )
                 , cheapest AS (
                     SELECT DISTINCT ON (product_id) product_id, retailer, price_cents, size_amount, size_unit, url
-                    FROM product_offers ORDER BY product_id, price_cents, size_amount DESC NULLS LAST
+                    FROM product_offers ORDER BY product_id, price_cents, size_amount DESC NULLS LAST, retailer, url
                 )
                 SELECT p.id, p.source_id, p.brand, p.name, p.category, p.spf, p.imported,
                        c.retailer, c.price_cents, c.size_amount, c.size_unit, c.url,
@@ -46,7 +46,7 @@ public class RoutineCatalog {
                 LEFT JOIN cheapest c ON c.product_id = p.id
                 WHERE p.source = 'curated' AND p.removed_at IS NULL AND p.category IN ('cleanser', 'treatment', 'moisturizer', 'sunscreen')
                 GROUP BY p.id, tg.tag, c.retailer, c.price_cents, c.size_amount, c.size_unit, c.url
-                ORDER BY p.id
+                ORDER BY p.source_id COLLATE "C"  -- byte order, like Python: products that tie in a ranking keep this order
                 """, rs -> {
             Row row = rows.computeIfAbsent(rs.getLong("id"), id -> {
                 try {
