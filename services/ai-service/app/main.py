@@ -6,16 +6,42 @@ Safety decisions (culprit ranking, red flags, remedy filtering) stay in rule-bas
 """
 
 import logging
+import threading
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException
 
 from app.config import Settings, get_settings
+from app.events.consumer import ProductEventsConsumer
+from app.events.read_model import ReadModel, ensure_database
+from app.events.schemas import load_schemas
 from app.explain import ExplanationFacts, InvalidExplanation, explain
 from app.llm import AnthropicLlm, Llm, LlmError
 
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="NextToSkin AI Service", version="0.1.0")
+consumer: ProductEventsConsumer | None = None
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Starts the catalog-events consumer in a background thread when Kafka is configured."""
+    global consumer
+    settings = get_settings()
+    thread = None
+    if settings.kafka_bootstrap_servers:
+        ensure_database(settings.read_model_url)
+        consumer = ProductEventsConsumer(settings.kafka_bootstrap_servers, ReadModel(settings.read_model_url),
+                                         load_schemas(settings.schemas_dir, "product-updated"))
+        thread = threading.Thread(target=consumer.run, name="product-events", daemon=True)
+        thread.start()
+    yield
+    if consumer is not None:
+        consumer.stop()
+        thread.join(timeout=10)
+
+
+app = FastAPI(title="NextToSkin AI Service", version="0.1.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -26,6 +52,8 @@ def health() -> dict:
         "status": "up",
         "env": settings.app_env,
         "llm_configured": settings.llm_configured,
+        "catalog_events": {"consuming": consumer is not None, **(consumer.stats if consumer else {}),
+                           "partitions": consumer.partitions if consumer else []},
     }
 
 

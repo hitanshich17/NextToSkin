@@ -100,8 +100,8 @@ products with manually maintained prices. Product links are plain links.
 4. Quiz + routine rules engine: step templates, clash rules, budget fit, climate from city (done)
 5. Replacements and feedback: "tried it? liked/disliked", pgvector similarity (done)
 6. AI: label reading, explanations (done); ranking model from feedback + evaluation set
-6b. Event-driven architecture: Kafka catalog events (producer done), recommender in FastAPI with its own read
-    model, Redis invalidation, Nginx + load tests, AWS ECS  <- NEXT
+6b. Event-driven architecture: Kafka catalog events (producer + consumer/read model done), recommender in FastAPI
+    using the read model, Redis invalidation, Nginx + load tests, AWS ECS  <- NEXT (recommender move)
 7. Frontend (Next.js), AWS deployment
 8. Community home remedies
 

@@ -76,15 +76,25 @@ services:
       retries: 10
 
   ai-service:
-    build: ./services/ai-service
+    build:
+      context: ./services/ai-service
+      additional_contexts:
+        schemas: ./schemas            # event schemas shared with the catalog service
     environment:
       APP_ENV: local
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-claude-haiku-5-5}
       LLM_EFFORT: ${LLM_EFFORT:-low}
       LLM_THINKING: ${LLM_THINKING:-disabled}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      READ_MODEL_URL: postgresql://${POSTGRES_USER:-skinvidhi}:${POSTGRES_PASSWORD:-skinvidhi_dev_password}@postgres:5432/recommender
     ports:
       - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 10s

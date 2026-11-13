@@ -1,6 +1,16 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _find_schemas_dir() -> str:
+    """The nearest schemas/ folder above this file: the repo root in development, /app/schemas in the image."""
+    for parent in Path(__file__).resolve().parents:
+        if (parent / "schemas").is_dir():
+            return str(parent / "schemas")
+    return "schemas"
 
 
 class Settings(BaseSettings):
@@ -21,6 +31,13 @@ class Settings(BaseSettings):
     llm_thinking: str = "disabled"
     # Kept below core-api's read timeout, so core-api gets an answer (or an error) before it gives up.
     llm_timeout_seconds: float = 4.0
+
+    # Catalog events (docs/events.md). Empty bootstrap servers: no consumer (e.g. unit tests).
+    kafka_bootstrap_servers: str = ""
+    # The recommender's own database, created on startup if missing.
+    read_model_url: str = "postgresql://skinvidhi:skinvidhi_dev_password@localhost:5432/recommender"
+    # Versioned event schemas shared with the catalog service (repo root schemas/, copied into the image).
+    schemas_dir: str = Field(default_factory=lambda: _find_schemas_dir())
 
     @property
     def llm_configured(self) -> bool:

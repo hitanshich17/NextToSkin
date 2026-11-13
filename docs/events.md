@@ -41,7 +41,30 @@ catalog import ──▶ products, ingredients, offers, tags (PostgreSQL)
 - Schemas live in `schemas/<event>/vN.json`. Producer tests validate every produced event against the schema;
   consumer tests validate what they accept. A CI check compares each version with the previous one.
 
-## Consuming (next step)
+## Consuming: the recommender's read model
 
-The recommender consumes in a consumer group with retries and a dead-letter topic
-(`catalog.product-updated.dlt`) for events that still fail; details come with that step.
+The FastAPI service (`app/events/`) consumes in a background thread and keeps its own `recommender` database.
+
+- **Consumer group `recommender`:** Kafka shares the 3 partitions among running instances; each event is handled
+  by one of them. A new group starts from the beginning of the topic, so a fresh instance rebuilds the read model.
+- **At least once, applied exactly once:** offsets are committed only after the event is stored. Each event's
+  `eventId` is recorded in the same transaction as the product, so a redelivered event is skipped.
+- **Dead-letter topic `catalog.product-updated.dlt`:** events that can never succeed (not JSON, schema violation,
+  message key not matching the product id) go there immediately, with headers saying why and where they came from
+  (`x-error`, `x-original-topic`, `x-original-partition`, `x-original-offset`, `x-failed-at`). Other errors are
+  retried 3 times with backoff (0.5 s, 1 s), then dead-lettered.
+- **Database outages are waited out**, with backoff up to 30 s, instead of dead-lettering: the event isn't at
+  fault, and the consumer simply doesn't advance until the database is back.
+- **Schemas:** each event is validated against `schemas/product-updated/v<schemaVersion>.json`; an event from a newer,
+  backward-compatible version is checked against the newest schema the consumer knows.
+- **Thread safety:** the read model uses a connection pool, because request threads read while the consumer writes.
+- Health: `GET /health` on the AI service shows `catalog_events` (applied, duplicates, dead-lettered, retries,
+  owned partitions).
+
+## Tests
+
+- Java (Testcontainers, real Kafka + PostgreSQL): produced events match the schema; dedup, rename, removal,
+  per-key order; relay ordering on failure.
+- Python (Testcontainers, real Kafka + PostgreSQL): read model built from events, duplicates skipped, bad events
+  dead-lettered with headers, offsets committed, 3 partitions shared by a 2-member group; unit tests for the retry
+  rules; the schema compatibility check.
