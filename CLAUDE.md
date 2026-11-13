@@ -52,6 +52,14 @@ AHAs, irritants, sensitivities). AI/ML is used where it solves a real problem:
   (length, sentences, medical claims, safety-note topics, links, leaked instructions, near-miss product names)
   and cached in Redis; bump ExplanationService.PROMPT_VERSION when the prompt, checks or model change.
   Whenever there is no valid answer within ~4s, core-api shows a template explanation.
+- Event-driven architecture (author's decisions, to match the resume; docs/events.md): core-api becomes the
+  catalog service and publishes `product-updated` events to Kafka (topic catalog.product-updated, 3 partitions,
+  key = product id) through a transactional outbox (snapshot-hash diff, relay with advisory lock, at least once).
+  The recommender moves from Java to the FastAPI service and keeps its own read model built only from events
+  (consumer group, retries, dead-letter topic catalog.product-updated.dlt). Event schemas are versioned JSON Schema
+  files in schemas/, backward compatible only, checked in CI. Then: Redis cache-aside invalidated by catalog
+  events, 3 recommender instances behind Nginx with load tests (report only measured numbers), AWS ECS on one EC2
+  instance. Order: Kafka -> recommender move -> Redis -> Nginx/load tests -> AWS.
 - Sizes: fl oz -> ml, oz -> g; liquids sold in "oz" count as fl oz; creams, balms and sticks keep oz.
 - OTC active ingredients (acne treatments, sunscreens) are stored separately with their percentage.
 - Curated catalog: ~25 products per category; the author approves each list. Claude reads ingredients
@@ -70,8 +78,8 @@ products with manually maintained prices. Product links are plain links.
   routine rules engine, replacements, feedback.
 - services/ai-service: Python 3.12, FastAPI. Label reading (vision LLM), embeddings, explanations,
   ranking model.
-- PostgreSQL 16 + pgvector, Redis, S3 + SQS (LocalStack locally).
-- Deployment later: one EC2 t4g.small running Docker Compose, S3/SQS, IAM, CloudWatch,
+- PostgreSQL 16 + pgvector, Redis, Kafka (KRaft, apache/kafka image), S3 + SQS (LocalStack locally).
+- Deployment later: AWS ECS on one EC2 instance (was: one EC2 t4g.small running Docker Compose), S3/SQS, IAM, CloudWatch,
   all in Terraform, deployed by GitHub Actions via OIDC (no stored AWS keys). Budget is tight: avoid
   NAT gateways, load balancers, ElastiCache, EKS. Kubernetes manifests run on a local kind/minikube cluster.
 
@@ -91,7 +99,9 @@ products with manually maintained prices. Product links are plain links.
 3. US product catalog: curated products, prices, categories (done: 103 products, 139 offers)
 4. Quiz + routine rules engine: step templates, clash rules, budget fit, climate from city (done)
 5. Replacements and feedback: "tried it? liked/disliked", pgvector similarity (done)
-6. AI: label reading, explanations; ranking model from feedback + evaluation set  <- NEXT
+6. AI: label reading, explanations (done); ranking model from feedback + evaluation set
+6b. Event-driven architecture: Kafka catalog events (producer done), recommender in FastAPI with its own read
+    model, Redis invalidation, Nginx + load tests, AWS ECS  <- NEXT
 7. Frontend (Next.js), AWS deployment
 8. Community home remedies
 

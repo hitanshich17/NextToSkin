@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/hitanshich17/NextToSkin/schemas/product-updated/v1.json",
+  "title": "product-updated v1",
+  "description": "A full snapshot of one catalog product, published whenever the product changes. Key: product.id.",
+  "type": "object",
+  "required": ["schemaVersion", "eventId", "eventType", "occurredAt", "product"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "eventId": {"type": "string", "format": "uuid", "description": "Unique per event; consumers deduplicate on it."},
+    "eventType": {"const": "product-updated"},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "product": {
+      "type": "object",
+      "required": ["id", "status", "brand", "name", "category", "imported", "actives", "ingredients", "offers"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["ACTIVE", "REMOVED"]},
+        "brand": {"type": ["string", "null"]},
+        "name": {"type": "string"},
+        "category": {"type": ["string", "null"], "description": "cleanser, treatment, moisturizer, sunscreen, ..."},
+        "spf": {"type": ["integer", "null"], "minimum": 1, "maximum": 100},
+        "imported": {"type": "boolean", "description": "Sold in the US but not FDA-approved as a sunscreen."},
+        "actives": {
+          "description": "Declared OTC active ingredients (acne treatments, UV filters).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "tags"],
+            "properties": {
+              "name": {"type": "string"},
+              "percent": {"type": ["number", "null"]},
+              "tags": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "ingredients": {
+          "description": "Canonical ingredients in label order (position 1 = highest concentration).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "position", "tags"],
+            "properties": {
+              "name": {"type": "string"},
+              "position": {"type": "integer", "minimum": 1},
+              "tags": {"type": "array", "items": {"type": "string"}}
+            }
+          }
+        },
+        "offers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["retailer", "priceCents", "url"],
+            "properties": {
+              "retailer": {"type": "string"},
+              "priceCents": {"type": "integer", "minimum": 0},
+              "sizeAmount": {"type": ["number", "null"]},
+              "sizeUnit": {"enum": ["ml", "g", null]},
+              "url": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

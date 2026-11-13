@@ -44,7 +44,7 @@ public class RoutineCatalog {
                 FROM products p
                 LEFT JOIN tagged tg ON tg.product_id = p.id
                 LEFT JOIN cheapest c ON c.product_id = p.id
-                WHERE p.source = 'curated' AND p.category IN ('cleanser', 'treatment', 'moisturizer', 'sunscreen')
+                WHERE p.source = 'curated' AND p.removed_at IS NULL AND p.category IN ('cleanser', 'treatment', 'moisturizer', 'sunscreen')
                 GROUP BY p.id, tg.tag, c.retailer, c.price_cents, c.size_amount, c.size_unit, c.url
                 ORDER BY p.id
                 """, rs -> {

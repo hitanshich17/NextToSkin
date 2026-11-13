@@ -12,6 +12,15 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all                    # an event counts as sent only when every in-sync replica has it
+      properties:
+        enable.idempotence: true   # retries never write the same event twice to the topic
+        max.block.ms: 5000         # don't wait a minute for a missing broker; the relay retries later
   data:
     redis:
       host: ${REDIS_HOST:localhost}

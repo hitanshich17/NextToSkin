@@ -7,6 +7,7 @@ import com.nexttoskin.core.catalog.CatalogCsvReader.CatalogProduct;
 import com.nexttoskin.core.catalog.ProductWriter.ProductData;
 import com.nexttoskin.core.ingredient.IngredientListParser;
 import com.nexttoskin.core.ingredient.IngredientResolver;
+import com.nexttoskin.core.events.CatalogEvents;
 import com.nexttoskin.core.ingredient.IngredientTagger;
 import com.nexttoskin.core.similarity.ProductVectors;
 import com.nexttoskin.core.ingredient.LabelIngredient;
@@ -41,14 +42,16 @@ public class CatalogImporter {
     private final ProductWriter productWriter;
     private final IngredientTagger tagger;
     private final ProductVectors vectors;
+    private final CatalogEvents events;
 
     public CatalogImporter(JdbcTemplate jdbc, TransactionTemplate tx, ProductWriter productWriter,
-                           IngredientTagger tagger, ProductVectors vectors) {
+                           IngredientTagger tagger, ProductVectors vectors, CatalogEvents events) {
         this.jdbc = jdbc;
         this.tx = tx;
         this.productWriter = productWriter;
         this.tagger = tagger;
         this.vectors = vectors;
+        this.events = events;
     }
 
     /** Imports catalog/products.csv and catalog/offers.csv from the given directory. */
@@ -86,6 +89,15 @@ public class CatalogImporter {
                 jdbc.update("DELETE FROM product_offers WHERE product_id = ?", id);
                 productIds.put(p.id(), id);
             }
+            // Products dropped from the file are marked removed (feedback still refers to them); re-added ones return.
+            String[] ids = catalog.products().stream().map(CatalogProduct::id).toArray(String[]::new);
+            jdbc.update("""
+                    UPDATE products SET removed_at = CASE WHEN source_id = ANY (?) THEN NULL ELSE coalesce(removed_at, now()) END
+                    WHERE source = ?
+                    """, ps -> {
+                ps.setArray(1, ps.getConnection().createArrayOf("text", ids));
+                ps.setString(2, SOURCE);
+            });
             for (CatalogOffer o : catalog.offers()) {
                 jdbc.update("""
                         INSERT INTO product_offers
@@ -98,6 +110,7 @@ public class CatalogImporter {
         });
         tagger.retagAll();
         vectors.rebuildAll();
+        events.sync(); // product-updated events for whatever changed (docs/events.md)
         return new Result(catalog.products().size(), catalog.offers().size(), resolver.ingredientsCreated());
     }
 }
